@@ -4,7 +4,7 @@ import numpy as np
 from glob import glob
 
 # --- CONFIGURATION ---
-dataset_root = "path/to/your/dataset_root"
+dataset_root = "data/training/"
 input_tif_dir = os.path.join(dataset_root, "images")  # Where your TIFs are now
 output_jpg_dir = os.path.join(dataset_root, "images_jpg")  # Where to save new JPGs
 
