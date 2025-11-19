@@ -1,5 +1,6 @@
 import os
 import cv2
+import numpy as np
 from glob import glob
 
 # --- CONFIGURATION ---
@@ -18,31 +19,31 @@ class_map = {
 }
 
 
-# ---------------------
-
 def convert_mask_to_yolo(mask_path, class_id: int, img_width: int, img_height: int) -> list:
-    # Read mask as grayscale.
-    # Note: If your TIF masks are not 0-255 (e.g. 0-1 binary),
-    # OpenCV handles them, but we ensure we treat non-zero as the object.
-    # mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    mask = cv2.imread(mask_path)
-    print("mask")
-    print(mask.shape)
-    # check if mask is all zeros
-    if mask is not None and cv2.countNonZero(mask[:, :, 0]) == 0:
-        print('mask is all zeros in channel 0')
-    if mask is not None and cv2.countNonZero(mask[:, :, 1]) == 0:
-        print('mask is all zeros in channel 1')
-    if mask is not None and cv2.countNonZero(mask[:, :, 2]) == 0:
-        print('mask is all zeros in channel 2')
-
+    # Read mask unchanged (keeps bit depth / channels)
+    mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
     if mask is None:
         return []
 
-    # Find contours
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    print("contours")
-    print(contours)
+    # Convert to single-channel grayscale if needed
+    if mask.ndim == 3:
+        gray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = mask
+
+    # Ensure 8-bit (findContours requires CV_8UC1)
+    if gray.dtype != np.uint8:
+        gray = cv2.normalize(src=gray, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX).astype(np.uint8)
+
+    # Binarize: treat any non-zero as object
+    _, bw = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+
+    # Quick empty check
+    if cv2.countNonZero(bw) == 0:
+        return []
+
+    # Find contours on the binary single-channel image
+    contours, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     yolo_lines = []
     for cnt in contours:
@@ -51,20 +52,17 @@ def convert_mask_to_yolo(mask_path, class_id: int, img_width: int, img_height: i
 
         epsilon = 0.005 * cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, epsilon, True)
-        points = approx.flatten().reshape(-1, 2)
+        points = approx.reshape(-1, 2)
 
         normalized_points = []
         for x, y in points:
-            # Normalize and Clamp
-            norm_x = max(0, min(1, x / img_width))
-            norm_y = max(0, min(1, y / img_height))
+            norm_x = max(0.0, min(1.0, float(x) / img_width))
+            norm_y = max(0.0, min(1.0, float(y) / img_height))
             normalized_points.extend([norm_x, norm_y])
 
         line = f"{class_id} " + " ".join(map(str, normalized_points))
         yolo_lines.append(line)
 
-    print("yolo_lines")
-    print(yolo_lines)
     return yolo_lines
 
 
@@ -83,15 +81,15 @@ def main():
     for img_path in image_files:
         filename = os.path.basename(img_path)
         name_no_ext = os.path.splitext(filename)[0]
-        print(f'name_no_ext: {name_no_ext}')
+        # print(f'name_no_ext: {name_no_ext}')
 
         # Read image using UNCHANGED to safely get dimensions
         # (even if 16-bit or multispectral)
         img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-        # print(f'img shape: {img.shape}')
+        # print(f'\timg shape: {img.shape}')
 
         if img is None:
-            print(f"Could not read image: {filename}")
+            print(f"\tCould not read image: {filename}")
             continue
 
         # Handle case where image has shape (H, W) (grayscale) or (H, W, C)
@@ -106,13 +104,13 @@ def main():
         for class_name, class_id in class_map.items():
             # Assuming mask filename matches image filename exactly (including .tif extension)
             mask_path = os.path.join(labels_dir, class_name, filename)
-            # print(f'\tChecking mask path: {mask_path}')
+            # print(f'\t\tChecking mask path: {mask_path}')
 
             if os.path.exists(mask_path):
-                print(f'\t mask_path "{mask_path}" found for class "{class_name}" (ID: {class_id})')
+                # print(f'\t\tmask_path "{mask_path}" found for class "{class_name}" (ID: {class_id})')
                 lines = convert_mask_to_yolo(mask_path, class_id, w, h)
-                # print(f'\t Converted {len(lines)} polygons for class "{class_name}"')
-                # print(f'\t lines: {lines}"')
+                # print(f'\t\tConverted {len(lines)} polygons for class "{class_name}"')
+                # print(f'\t\tlines: {lines}"')
                 all_yolo_lines.extend(lines)
 
         if all_yolo_lines:
