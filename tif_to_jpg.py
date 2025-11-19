@@ -29,7 +29,7 @@ def main():
         img = cv2.imread(tif_path, cv2.IMREAD_UNCHANGED)
 
         if img is None:
-            print(f"❌ Error reading: {filename}")
+            print(f"Error reading: {filename}")
             continue
 
         # --- STEP 1: Handle 16-bit images ---
@@ -59,7 +59,7 @@ def main():
         # quality=95 is a good balance (default is usually 95)
         cv2.imwrite(output_path, img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
 
-    print(f"✅ Done! Converted images saved to: {output_jpg_dir}")
+    print(f"Done! Converted images saved to: {output_jpg_dir}")
 
 
 if __name__ == "__main__":
