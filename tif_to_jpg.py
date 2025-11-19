@@ -16,8 +16,7 @@ def main():
     os.makedirs(output_jpg_dir, exist_ok=True)
 
     # Find all TIF images
-    tif_files = glob(os.path.join(input_tif_dir, "*.tif")) + \
-                glob(os.path.join(input_tif_dir, "*.tiff"))
+    tif_files = glob(os.path.join(input_tif_dir, "*.tif")) + glob(os.path.join(input_tif_dir, "*.tiff"))
 
     print(f"Found {len(tif_files)} TIF files. Converting to JPG...")
 
