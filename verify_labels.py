@@ -55,11 +55,12 @@ def main():
 
         # 1. Load Image (Needed for dimensions)
         img = cv2.imread(img_path)
-        if img is None: continue
+        if img is None:
+            continue
         h, w = img.shape[:2]
 
         # 2. Create a Black Canvas
-        mask = np.zeros((h, w), dtype=np.uint8)
+        mask = np.zeros(shape=(h, w), dtype=np.uint8)
 
         # 3. Parse Label File
         if os.path.exists(label_path):
